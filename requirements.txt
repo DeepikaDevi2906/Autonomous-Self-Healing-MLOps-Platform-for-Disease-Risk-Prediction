@@ -1,0 +1,17 @@
+# Runtime dependencies for the API, pipelines and scripts.
+# Pinned to the versions this project was developed and tested with
+# (the old file was unpinned and UTF-16 encoded).
+pandas==2.3.3
+numpy==2.2.6
+scikit-learn==1.7.2
+# CPU-only XGBoost (same "import xgboost", ~300 MB smaller); macOS has no cpu wheel
+xgboost-cpu==3.2.0; sys_platform != "darwin"
+xgboost==3.2.0; sys_platform == "darwin"
+mlflow==3.14.0
+evidently==0.7.21
+joblib==1.5.3
+cloudpickle==3.1.2
+fastapi==0.136.3
+uvicorn==0.51.0
+pydantic==2.13.4
+pyyaml==6.0.3

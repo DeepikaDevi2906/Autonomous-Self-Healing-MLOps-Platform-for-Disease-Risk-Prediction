@@ -1,0 +1,166 @@
+# Downloads every package in wheels\links.txt into .\wheels with retries and
+# SHA-256 verification. Uses only PowerShell (no Python needed). Run from the
+# project folder:   .\scripts\download_wheels_direct.ps1
+# If blocked:       powershell -ExecutionPolicy Bypass -File .\scripts\download_wheels_direct.ps1
+
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"   # much faster Invoke-WebRequest
+Set-Location (Split-Path -Parent $PSScriptRoot)
+
+$packages = @(
+    @("https://files.pythonhosted.org/packages/71/43/1947f06babed6b3f1d7f38b0c767f52df66bfb2bc10b468c4a7de9eceff2/aiohappyeyeballs-2.7.1-py3-none-any.whl", "9243213661e29250eb41368e5daa826fc017156c3b8a11440826b2e3ed376472"),
+    @("https://files.pythonhosted.org/packages/bd/ff/cb36724e8c8d17f90ada567a9ff3efe1d6e9b549fba697a242aece180f21/aiohttp-3.14.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "48d67b87db6279c044760787eb01f6413032c2e6f3ba1cafaa492b1c8e578479"),
+    @("https://files.pythonhosted.org/packages/fb/76/641ae371508676492379f16e2fa48f4e2c11741bd63c48be4b12a6b09cba/aiosignal-1.4.0-py3-none-any.whl", "053243f8b92b990551949e63930a839ff0cf0b0ebbe0597b0f3fb19e1a0fe82e"),
+    @("https://files.pythonhosted.org/packages/3f/27/78a89b55b0904d222183164e079b4ca56208e94eff1d35ad1f1ad5be9b06/alembic-1.20.0-py3-none-any.whl", "77eb101048d95f982c0353e9233404889dcd7a6fc244c107836c0e2fc9cf7d9d"),
+    @("https://files.pythonhosted.org/packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl", "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101"),
+    @("https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl", "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0"),
+    @("https://files.pythonhosted.org/packages/12/b8/4bd346e22b28902df4d651910f5242c28d84e4a5c2435ca5c3f797ed7e2e/anyio-4.15.1-py3-none-any.whl", "6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101"),
+    @("https://files.pythonhosted.org/packages/3b/00/2344469e2084fb287c2e0b57b72910309874c3245463acd6cf5e3db69324/appdirs-1.4.4-py2.py3-none-any.whl", "a841dacd6b99318a741b166adb07e19ee71a274450e68237b4650ca1055ab128"),
+    @("https://files.pythonhosted.org/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl", "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"),
+    @("https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl", "ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc"),
+    @("https://files.pythonhosted.org/packages/cc/bb/1c6e7a89b11da19f137e4ef5a5c5fe47a5bb686449ba343944ccf8fb34b2/cachetools-7.2.0-py3-none-any.whl", "3045213f186b89fdd95d94441354c4bd87c570b7a38d8c3fd1d9dd37f6dc90d8"),
+    @("https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl", "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775"),
+    @("https://files.pythonhosted.org/packages/75/77/60bebf6f818bec84210ac5b6979ce4eeadce6fbbaabc9c7ab23e506d1ce5/cffi-2.1.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", "194cffa889098ced9976c3fc6340305e43f6303657d298da55366907c05c22d6"),
+    @("https://files.pythonhosted.org/packages/c4/9f/9f52d2886d52645987d603425482c63c5045a3005db1354a7097e5ed1ae9/charset_normalizer-3.5.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "8a893cc101149f80a653f82062ebc95b34525a2614382e1da5458fe7c6997249"),
+    @("https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl", "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360"),
+    @("https://files.pythonhosted.org/packages/88/39/799be3f2f0f38cc727ee3b4f1445fe6d5e4133064ec2e4115069418a5bb6/cloudpickle-3.1.2-py3-none-any.whl", "9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a"),
+    @("https://files.pythonhosted.org/packages/32/5c/1ee32d1c7956923202f00cf8d2a14a62ed7517bdc0ee1e55301227fc273c/contourpy-1.3.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", "ad687a04bc802cbe8b9c399c07162a3c35e227e2daccf1668eb1f278cb698631"),
+    @("https://files.pythonhosted.org/packages/78/13/fba657f958d2af66ea959a4ba01212632089249d34af1ae48054136344d7/cryptography-48.0.1-cp39-abi3-manylinux_2_28_x86_64.whl", "88c852a0ae366e262e5a1744b685e6a433dc8788dd2a277e418bf4904203609d"),
+    @("https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl", "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30"),
+    @("https://files.pythonhosted.org/packages/ce/12/8e81ba33850ea45b015e54372b7d1aeab42315f552b2b2d55e8a31bc6802/databricks_sdk-0.143.0-py3-none-any.whl", "7742d3e80fdabbc17ec1c718e1bbf600ac4f660e0063b5d43d32ca3387e74f15"),
+    @("https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", "a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"),
+    @("https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl", "a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"),
+    @("https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", "7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2"),
+    @("https://files.pythonhosted.org/packages/75/23/529140fe1aab80fc6992f93a706deec709140a6397439139a054e1515c45/docker-7.2.0-py3-none-any.whl", "a3f45fdeb9165e2d25d9a1d02ddf3bc70fb572cf5ebbf9b58558c22caf29b71f"),
+    @("https://files.pythonhosted.org/packages/95/41/b38501c34c40c3261868a2af8ed5fffe3e6d889c680638708de27eb57788/dynaconf-3.3.5-py3-none-any.whl", "b3b4a753d5c866fc85466b65fc58d4954f6ed7dc8aa67f2b15bcbfd85d184687"),
+    @("https://files.pythonhosted.org/packages/da/7e/1728a3a1e8fcd6865f3642c260feb5c03b436b62d5b12812f50d4d27e8ed/evidently-0.7.21-py3-none-any.whl", "04e247de0ce8eabe618687770568ca06162e64a39ebf10e33ef6ea3aeda31187"),
+    @("https://files.pythonhosted.org/packages/e1/d2/58beb2b8355f89b483fa21b99fe9934ee7312e3ccf228bb7cefe9e8d979c/faker-40.40.0-py3-none-any.whl", "cd45ebdd1363f92a45740ac49945e49fa18f7e10771884a83c796a235550d7b7"),
+    @("https://files.pythonhosted.org/packages/e0/82/45359b62a067409bd929ae8a56b8ed13e5a8c8a61194b3c236920999ab83/fastapi-0.136.3-py3-none-any.whl", "3d2a69bdf04b7e9f3afa292c3bc7a98816bbfafa10bc9b45f3f3700d2f761620"),
+    @("https://files.pythonhosted.org/packages/06/cf/1731c0dd182ee35f80a39e63afb3d03056ea0dd561b7498932b10b2e34d9/filelock-4.0.7-py3-none-any.whl", "a93c4d93269b339a6af4848342c7e940d0f9928ad95eff64764699e5f1bf8a6a"),
+    @("https://files.pythonhosted.org/packages/7f/9c/34f6962f9b9e9c71f6e5ed806e0d0ff03c9d1b0b2340088a0cf4bce09b18/flask-3.1.3-py3-none-any.whl", "f4bcbefc124291925f1a26446da31a5178f9483862233b23c0c96a20701f670c"),
+    @("https://files.pythonhosted.org/packages/49/55/5bb1a2d918e9f02f131e47a59032bae70e48050e986e941511fd737a935c/flask_cors-6.0.5-py3-none-any.whl", "68fcf75693e961f3af26683b23c4b9a8fb6b64de17d20d0c37b95e8de7ab2ed8"),
+    @("https://files.pythonhosted.org/packages/ee/56/151b5e81d20c63834f48ad37a0cbbbe2f9b248e38f8d10387f0cf5219244/fonttools-4.65.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", "fb53892b570f7f1f0055e75fc4de32673e32f749c4c8a606b63d5c436650e634"),
+    @("https://files.pythonhosted.org/packages/fc/75/0576b03f7889ad25b5385b4f6c69e0543713425a6f193b056c9b0a2e65ce/formulaic-1.2.2-py3-none-any.whl", "0f84ff49e3fc9dc0e68ab08a0a9427874021aa6c558e66b44dc634a35739b09b"),
+    @("https://files.pythonhosted.org/packages/5d/ed/c7895fd2fde7f3ee70d248175f9b6cdf792fb741ab92dc59cd9ef3bd241b/frozenlist-1.8.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", "f57fb59d9f385710aa7060e89410aeb5058b99e62f4d16b08b91986b9a2140c2"),
+    @("https://files.pythonhosted.org/packages/6c/c0/a98505f18594f1bce828bb159cec0fcf9860562f1a2c85913409fc8f3d9e/fsspec-2026.9.0-py3-none-any.whl", "8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f"),
+    @("https://files.pythonhosted.org/packages/a0/61/5c78b91c3143ed5c14207f463aecfc8f9dbb5092fb2869baf37c273b2705/gitdb-4.0.12-py3-none-any.whl", "67073e15955400952c6565cc3e707c554a4eea2e428946f7a4c162fab9bd9bcf"),
+    @("https://files.pythonhosted.org/packages/fa/48/f36d233ce749d1bb880cb5e6f8bb171dc2effabc7435c31da604d831b3ec/gitpython-3.2.0-py3-none-any.whl", "bd70c5ec05cd2b797423e7eb312147d2458d3cca92085888fba2213f85905537"),
+    @("https://files.pythonhosted.org/packages/7d/fd/4208e3ac1d7df39f4e8b044a3943eb8a5a99aaf8699285bf780f614a0b30/google_auth-2.59.0-py3-none-any.whl", "43e47b1d3067fb90d77bd9ba21f139bb0577b3f2b9f3e2516fc00f37435efcad"),
+    @("https://files.pythonhosted.org/packages/66/e0/61d8e98007182e6b2aca7cf65904721fb2e4bce0192272ab9cb6f69d8812/graphene-3.4.3-py2.py3-none-any.whl", "820db6289754c181007a150db1f7fff544b94142b556d12e3ebc777a7bf36c71"),
+    @("https://files.pythonhosted.org/packages/1f/b4/b52a324b0b297ddc49b8ea31a51d39fae63132f694a267b9381d94e2e0af/graphql_core-3.2.13-py3-none-any.whl", "b0eb04f2c31556b2310a77c8fb53c74e8b56570f8fea594d89c6ef7827dbb497"),
+    @("https://files.pythonhosted.org/packages/74/16/a4cf06adbc711bd364a73ce043b0b08d8fa5aae3df11b6ee4248bcdad2e0/graphql_relay-3.2.0-py3-none-any.whl", "c9b22bd28b170ba1fe674c74384a8ff30a76c8e26f88ac3aa1584dd3179953e5"),
+    @("https://files.pythonhosted.org/packages/94/5c/092682ae7ca1aadd44aa36b0bc35c48c9ed55f9ffebb5794980b1e2ae74b/greenlet-3.5.6-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", "eed88b64a5e5da72d6a71cdc5aaeefaa5ced9b748f8d19f89800b339961dad39"),
+    @("https://files.pythonhosted.org/packages/fe/85/7522a52e5e2f42faf1a129113ab63e548c42e103e9af395b7bfe65e403e2/gunicorn-26.2.0-py3-none-any.whl", "bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3"),
+    @("https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86"),
+    @("https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55"),
+    @("https://files.pythonhosted.org/packages/e6/e4/77487e14fc7be47180fd0eb4267c7486d0cc59b74031839a3daf8650136b/httptools-0.8.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", "a6f21e2a3b0067bbe7f67e34cfd16276af556e5e52f4c7503be0cb5f90e905e4"),
+    @("https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl", "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad"),
+    @("https://files.pythonhosted.org/packages/57/31/cee585bd4d1e39947a426a6736f4e17d22b454952370fb9cf48eb3103085/huey-3.4.0-py3-none-any.whl", "d0580762397744026f83baae5f2b97a62474a62b8565ac75bbafefe72f9c784f"),
+    @("https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl", "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"),
+    @("https://files.pythonhosted.org/packages/b3/55/ecca97ae19075f1fac62def77731e7f535e6c1fb8f92ff08160c5e6dade8/importlib_metadata-9.0.1-py3-none-any.whl", "bba5600596a7e21f3eef53281cf28d6a5195634d2f2b78ff9501a3272c6eaab0"),
+    @("https://files.pythonhosted.org/packages/a1/d3/20a61a248feb1249cd81f83ce731f0bdf5170ed96a08a298f7081cda9e90/interface_meta-2.0.1-py3-none-any.whl", "f38016bef9a4429b6d0792d809be7b65e9781820c674bf7f463999086b6e6323"),
+    @("https://files.pythonhosted.org/packages/1a/82/7331bbf84f1ccce7a2dd09a580c7bad38417cf35c84dc0b81bce2cf779b9/iterative_telemetry-0.0.10-py3-none-any.whl", "e58ffb60d22c3de8dad6a114697cc61f6c14911cae484bf90df394e0d6553603"),
+    @("https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl", "c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef"),
+    @("https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67"),
+    @("https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl", "5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713"),
+    @("https://files.pythonhosted.org/packages/f1/0e/9f394d693be549fa3fab62498c2778294595991047adc3dcf10aa99b91c0/kiwisolver-1.5.1-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", "e05c2f7925f1d88778e53cb44f14e0223204a3bdd09a41664750363acfb1f2ef"),
+    @("https://files.pythonhosted.org/packages/c8/ce/4697b547790f23d2fcc37a928d48c38140cf86360e4041ca8177e3367c14/litestar-2.24.0-py3-none-any.whl", "0ef13630173ea147847363f03f0459877ab14a572e68b2af7a25796055513a31"),
+    @("https://files.pythonhosted.org/packages/f2/24/8d99982f0aa9c1cd82073c6232b54a0dbe6797c7d63c0583a6c68ee3ddf2/litestar_htmx-0.5.0-py3-none-any.whl", "92833aa47e0d0e868d2a7dbfab75261f124f4b83d4f9ad12b57b9a68f86c50e6"),
+    @("https://files.pythonhosted.org/packages/6d/a0/053d6af3e8f871e0073b4a36732d9e65be77a72e5434c31b94f6af78a6bb/mako-1.4.3-py3-none-any.whl", "723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f"),
+    @("https://files.pythonhosted.org/packages/b3/81/4da04ced5a082363ecfa159c010d200ecbd959ae410c10c0264a38cac0f5/markdown_it_py-4.2.0-py3-none-any.whl", "9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a"),
+    @("https://files.pythonhosted.org/packages/af/cd/ce6e848bbf2c32314c9b237839119c5a564a59725b53157c856e90937b7a/markupsafe-3.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "f42d0984e947b8adf7dd6dde396e720934d12c506ce84eea8476409563607591"),
+    @("https://files.pythonhosted.org/packages/fc/b7/d8bcec2626c35f96972bff656299fef4578113ea6193c8fdad324710410c/matplotlib-3.10.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", "1aa972116abb4c9d201bf245620b433726cb6856f3bef6a78f776a00f5c92d37"),
+    @("https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"),
+    @("https://files.pythonhosted.org/packages/de/b9/76dcdef7f7f856b36f18cfcd752c2717d9847812a0aaa36d50a7baed569d/mlflow-3.14.0-py3-none-any.whl", "dbf77f7cdb5b5c0ec59b4671c61730b1b914b4dff7a2892e267a547cb5454f56"),
+    @("https://files.pythonhosted.org/packages/58/e7/b80f76ce689b9d6f21cdb84abb2b02148a1149e63a6428dd2c629cefd061/mlflow_skinny-3.14.0-py3-none-any.whl", "a4880e086365871ef9d78e727a34ea5fb1ce615689579998d48e8c65ee1665a9"),
+    @("https://files.pythonhosted.org/packages/5f/4a/4658a9e514c8f079e40b608661844b9beb21c7530e6ee1e7f830cf81541e/mlflow_tracing-3.14.0-py3-none-any.whl", "854488dd18068f15e2a56f1cc7b8868c611d09ea39068d0a691a3f07e0048cae"),
+    @("https://files.pythonhosted.org/packages/c6/46/01fe71c42b3342f00e2dd6c5a8837f5dc4d0e1596b4c74c054fb13075201/msgspec-0.22.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "12a887c4c06e4a771a2db32c9a80c7bb21866b12458025f636dcdc2253331c28"),
+    @("https://files.pythonhosted.org/packages/bd/53/f65ed68b96eea2b4f6fa4f9031bdfccd8f3097c429e3d371c545d1c40ca4/multidict-6.9.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "d3b6e6840421c83ccb60398e333b44f910b0907bb409597685ab2eedd1e22eab"),
+    @("https://files.pythonhosted.org/packages/20/f1/11873ce60ad824ac44f796de9879879dcd62672a172cbafe6e26eb2ea848/multipart-2.0.1-py3-none-any.whl", "ac54d6bd0353ee30d2703af75adacd8b2052d4adb634e9e74dc7c5b06e0bcd86"),
+    @("https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl", "1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505"),
+    @("https://files.pythonhosted.org/packages/40/b5/1b84b2c784db76d69442334bc8b8748c840f13ca53be086f4f250ad4a0bc/narwhals-2.26.0-py3-none-any.whl", "29326d74f107c347fd1009bd58e38d9f7c7c5b51e6de97bc93dbc325d9038b54"),
+    @("https://files.pythonhosted.org/packages/b6/6d/ebd2af4640b12168fdf0cb74b6118df2f32a2f62ec7e0c06fbfd80706639/nltk-3.10.3-py3-none-any.whl", "ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c"),
+    @("https://files.pythonhosted.org/packages/b4/63/3de6a34ad7ad6646ac7d2f55ebc6ad439dbbf9c4370017c50cf403fb19b5/numpy-2.2.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", "fc7b73d02efb0e18c000e9ad8b83480dfcd5dfd11065997ed4c6747470ae8915"),
+    @("https://files.pythonhosted.org/packages/44/b9/040d1a1c7836922828e6480cd2366bb8fe0ebf75b413d2bb51a9b0e7f78f/opentelemetry_api-1.45.0-py3-none-any.whl", "80e068aba7cd56c8b58512d6a36f8d25cb1dfaa0c0a4cc1c938ccf9f362d9cb3"),
+    @("https://files.pythonhosted.org/packages/6b/45/814d55714507c7ce9c9cd86a4f83ceb5a74ab0bffcc63ff493943f138de2/opentelemetry_proto-1.45.0-py3-none-any.whl", "9731566359d7b8e1ee1e149d8e4ad6865bab965e657ad3387ec2784d16927666"),
+    @("https://files.pythonhosted.org/packages/8a/ae/46963201ce58d6b86f9e54087a39720a35ac9f57c3a9e440d275995c2b02/opentelemetry_sdk-1.45.0-py3-none-any.whl", "5dc634c946546f61b757c5b1781f9fd1a10e96ffaf7357c797e508fe9c57e75e"),
+    @("https://files.pythonhosted.org/packages/f4/93/2ad416d69c4ca8fd21ebc6894f23f4eda744dc6f43a14d7a9ffd7ed3abbd/opentelemetry_semantic_conventions-0.66b0-py3-none-any.whl", "175b19dd98c4473f4f43a2b1df59186fd7b4a48cd3f77cbe03438b6d6fda230a"),
+    @("https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"),
+    @("https://files.pythonhosted.org/packages/40/a8/4dac1f8f8235e5d25b9955d02ff6f29396191d4e665d71122c3722ca83c5/pandas-2.3.3-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", "dd7478f1463441ae4ca7308a70e90b33470fa593429f9d4c578dd00d1fa78838"),
+    @("https://files.pythonhosted.org/packages/20/70/cd3cf5cff538323076a879edef02cce6f13f7d75e03d12f211b0a0dbd178/patsy-1.0.3-py2.py3-none-any.whl", "d3dbebe8fd5f46e29912d030b63c6268647b59bf788a99e2af28a30234cf357c"),
+    @("https://files.pythonhosted.org/packages/4e/89/36f4cd76cf4baf05c50ababb976249153f18c959171c7f6ba09a6f217260/pillow-12.3.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", "f0606c8bf2cdefea14a43530f7657cbbb7ecf1c4222512492ef4a4434a9501ec"),
+    @("https://files.pythonhosted.org/packages/e5/ae/580600f441f6fc05218bd6c9d5794f4aef072a7d9093b291f1c50a9db8bc/plotly-5.24.1-py3-none-any.whl", "f67073a1e637eb0dc3e46324d9d51e2fe76e9727c892dde64ddf1e1b51f29089"),
+    @("https://files.pythonhosted.org/packages/dd/34/b6f19941adcdaf415b5e8a8d577499f5b6a76b59cbae37f9b125a9ffe9f2/polyfactory-3.3.0-py3-none-any.whl", "686abcaa761930d3df87b91e95b26b8d8cb9fdbbbe0b03d5f918acff5c72606e"),
+    @("https://files.pythonhosted.org/packages/fe/be/2e6798ace5cc036f5d05d36b7b2fd85346f1a708c87060890b070d0ec607/prettytable-3.18.0-py3-none-any.whl", "b3346e0e6f79180833aebaac088ae926340586cf6d7d991b9eb125b65f72313a"),
+    @("https://files.pythonhosted.org/packages/f0/51/5adee15e12a7e314cece4543fbf295b0fe1b504dc78b32dff4c8eb1e29b0/propcache-0.5.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "f574e460d1c8a08384a016fdb09ccf3543433263ed6b2f97104f979e64ea57c2"),
+    @("https://files.pythonhosted.org/packages/16/92/d1e32e3e0d894fe00b15ce28ad4944ab692713f2e7f0a99787405e43533a/protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl", "e9db7e292e0ab79dd108d7f1a94fe31601ce1ee3f7b79e0692043423020b0593"),
+    @("https://files.pythonhosted.org/packages/67/33/f75e91b9a64c3f33c787e263c93b871ad91b8a4a68c1d5cebddd9840e835/pyarrow-24.0.0-cp310-cp310-manylinux_2_28_x86_64.whl", "e3268e43984d0b1a185c89b4cfff282a7ead12fc93f56cfd7088bdbcbe727041"),
+    @("https://files.pythonhosted.org/packages/9a/3b/6163796d69c3977d1e4287bea4a6979161cbbdd170ebb430511e8e1999ce/pyasn1-0.6.4-py3-none-any.whl", "deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b"),
+    @("https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl", "29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a"),
+    @("https://files.pythonhosted.org/packages/0c/c3/44f3fbbfa403ea2a7c779186dc20772604442dde72947e7d01069cbe98e3/pycparser-3.0-py3-none-any.whl", "b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992"),
+    @("https://files.pythonhosted.org/packages/fd/7b/122376b1fd3c62c1ed9dc80c931ace4844b3c55407b6fb2d199377c9736f/pydantic-2.13.4-py3-none-any.whl", "45a282cde31d808236fd7ea9d919b128653c8b38b393d1c4ab335c62924d9aba"),
+    @("https://files.pythonhosted.org/packages/ba/1e/acc4d70f88a0a277e4a1fa77ebb985ceabaf900430f875bf9338e11c9420/pydantic_core-2.46.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", "395aebd9183f9d112f569aeb5b2214d1a10a33bec8456447f7fbdfa51d38d4cd"),
+    @("https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9"),
+    @("https://files.pythonhosted.org/packages/38/bb/d215ee7c73b61497b28a5503f9f53523f294fcc936762b7caf90e0c1c2b5/pyparsing-3.3.3-py3-none-any.whl", "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4"),
+    @("https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"),
+    @("https://files.pythonhosted.org/packages/0d/17/c5c6b53ddc18f297992099b3d9ec16c855c0ccc83263a21fe4d1c625ec6c/python_dotenv-1.2.3-py3-none-any.whl", "904552145e8bfed22162c09dab1c2b9b54fefa7b23ba780f4f26ca0316b0f0d9"),
+    @("https://files.pythonhosted.org/packages/d5/11/e3df59614bebe0ca50c905442603eda64ae7ac19811d4e4f74aa2d51ca85/pytz-2026.4-py2.py3-none-any.whl", "9d514388fbc89ca0833203464272ac485b8828568ab73532f5020f17e892a0ff"),
+    @("https://files.pythonhosted.org/packages/7a/1e/7acc4f0e74c4b3d9531e24739e0ab832a5edf40e64fbae1a9c01941cabd7/pyyaml-6.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "9c7708761fccb9397fe64bbc0395abcae8c4bf7b0eac081e12b809bf47700d0b"),
+    @("https://files.pythonhosted.org/packages/ec/99/eae371ca63f7ea1f1eac025021527adb57ce3a4b67ff608b896fd31ea447/regex-2026.9.29-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "4fb41211d2333eb930a51e0546a65999761cf1f572a4da56ef9b8a62966c06f2"),
+    @("https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"),
+    @("https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb"),
+    @("https://files.pythonhosted.org/packages/b5/51/b2b91aec091e86bc961e5164f00207d89f133cc82b5ddad541d2132ea819/rich_click-1.9.9-py3-none-any.whl", "365e7a9d0adb42e41ea832a0a12e02c44c079a26536dee688125eb9814f97274"),
+    @("https://files.pythonhosted.org/packages/58/0e/8c2a03d518fb6bd0b6b0d4b114c63d5f1db01ff0f9925d8eb10960d01c01/scikit_learn-1.7.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", "7a58814265dfc52b3295b1900cfb5701589d30a8bb026c7540f1e9d3499d5ec8"),
+    @("https://files.pythonhosted.org/packages/8e/6d/41991e503e51fc1134502694c5fa7a1671501a17ffa12716a4a9151af3df/scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", "9e2abc762b0811e09a0d3258abee2d98e0c703eee49464ce0069590846f31d40"),
+    @("https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl", "7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686"),
+    @("https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"),
+    @("https://files.pythonhosted.org/packages/44/a3/08ae9ea7f7c16e20a447d9289dce40f06f52607ed9a39f554a8426d96ba3/skops-0.16.0-py3-none-any.whl", "5b2eb1bc49392c74a38db04481e2d110f97d9a72d6ae38fbd698aa7a865a9070"),
+    @("https://files.pythonhosted.org/packages/c1/d4/59e74daffcb57a07668852eeeb6035af9f32cbfd7a1d2511f17d2fe6a738/smmap-5.0.3-py3-none-any.whl", "c106e05d5a61449cf6ba9a1e650227ecfb141590d2a98412103ff35d89fc7b2f"),
+    @("https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2"),
+    @("https://files.pythonhosted.org/packages/c8/93/9d26b109f5472017bf6e7a1b9dac12ac5f6165ba37a297834d0690c42cf3/sqlalchemy-2.0.54-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "0e7a76d5dce712ce50435d0f97181eb955ec27d138c004176f01282e063bac52"),
+    @("https://files.pythonhosted.org/packages/d9/50/f00935da0ec7cbf325f8dc4f772ae46fbc7b672dd62876e73f0a94adda57/sqlparse-0.6.0-py3-none-any.whl", "b861c0288ce2fa56209a9a6412d2e066ac664b3873b89c26c9d8415e8e32996f"),
+    @("https://files.pythonhosted.org/packages/4e/d6/1ec1b290f9e0fb067899b61e1d37a30c923068bad260b216dbe37a7d2967/starlette-1.7.0-py3-none-any.whl", "67f8e99895493dd2911a03f11314af6ceebeae4e704bb9f43dfc6a9db151c93e"),
+    @("https://files.pythonhosted.org/packages/92/f2/15a4d323326a52cc7d4a7b8e9fe72c85497fae514162ae2b1d8ee35aa3a2/statsmodels-0.15.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", "972c33d9fe6bf907b853ba0eccb2f7cf3da90fdddbee002b8478bcaccf637e2a"),
+    @("https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", "6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55"),
+    @("https://files.pythonhosted.org/packages/43/3f/f88a53f60a472b46f4023f56d204dd7de33d34c5d2acbfa0d70a674e639e/threadpoolctl-3.7.0-py3-none-any.whl", "cd8b60b5641b45c67bbf73c64c843235fc2d8a480c87389f52f5dbee893b86be"),
+    @("https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl", "c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73"),
+    @("https://files.pythonhosted.org/packages/dc/bf/205d0004930ede8f542fb58f601526fccf4ae7626075ca1e6c4de5d3d652/typer-0.27.2-py3-none-any.whl", "b3a5fc4342d5fc8fda8fc3010b1cf117e9249aab7fae800c2eff62fd3842d97d"),
+    @("https://files.pythonhosted.org/packages/65/f3/107a22063bf27bdccf2024833d3445f4eea42b2e598abfbd46f6a63b6cb0/typing_inspect-0.9.0-py3-none-any.whl", "9ee6fc59062311ef8547596ab6b955e1b8aa46242d854bfc78f4f6b0eff35f9f"),
+    @("https://files.pythonhosted.org/packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl", "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147"),
+    @("https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl", "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"),
+    @("https://files.pythonhosted.org/packages/f9/bc/8737e8d54cf51106118039b83f485a4783112fab49ea9d044b234978a46e/tzdata-2026.4-py2.py3-none-any.whl", "c2169a8b0a7a5e9674da5a135ccdfb2b3e671b333ed9fed17b41f73c34476e81"),
+    @("https://files.pythonhosted.org/packages/f3/ec/ed610aff77e0f060d0abb6e1d5ad8f07b2b6e4a0c5e765225ccc5f229ef4/ujson-6.0.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", "0e94f0b95459caa6cb5e333baf6763bf1e7a96ea5e4f1ea7fbb0ad88e81a88ab"),
+    @("https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl", "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"),
+    @("https://files.pythonhosted.org/packages/3d/b2/93faaab7962e2aa8d6e174afb6f76be2ca0ce89fde14d3af835acebcaa59/uuid6-2025.0.1-py3-none-any.whl", "80530ce4d02a93cdf82e7122ca0da3ebbbc269790ec1cb902481fa3e9cc9ff99"),
+    @("https://files.pythonhosted.org/packages/45/ec/dbb7e5a6b91f86bfb9eb7d2988a2730907b6a729875b949c7f022e8b88fa/uvicorn-0.51.0-py3-none-any.whl", "5d38af6cd620f2ae3849fb44fd4879e0890aa1febe8d47eb355fb45d93fe6a5b"),
+    @("https://files.pythonhosted.org/packages/b3/f6/21657bb3beb5f8c57ce8be3b83f653dd7933c2fd00545ed1b092d464799a/uvloop-0.22.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "481c990a7abe2c6f4fc3d98781cc9426ebd7f03a9aaa7eb03d3bfc68ac2a46bd"),
+    @("https://files.pythonhosted.org/packages/b5/e8/dbf020b4d98251a9860752a094d09a65e1b436ad181faf929983f697048f/watchdog-6.0.0-py3-none-manylinux2014_x86_64.whl", "20ffe5b202af80ab4266dcd3e91aae72bf2da48c0d33bdb15c66658e685e94e2"),
+    @("https://files.pythonhosted.org/packages/8a/cf/e3ad894ed5909a7c44b0707e89bc25d19a3d78b3a7aec846119443b6ae56/watchfiles-1.3.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", "b5768b49e426fd5b550b012c866db347cdf15c398ef98dc557b6e6b72fa74cd1"),
+    @("https://files.pythonhosted.org/packages/e2/a0/834886b30e3b885a5a96e8358f1b3917bc0bac43ae4178d77f0c210d079b/wcwidth-0.9.1-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", "747fb724223f417a17541a95a17c1dac3a8ef9a0cf41684950f0eab191a35f65"),
+    @("https://files.pythonhosted.org/packages/f3/18/a17e2f0cde02dc10154c808deed7e1d8528afff93612f70d3f0a5b19b011/websockets-16.1.1-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", "1214e673c404684b9bf7154f5cf43b45025b1a6160fac3a9e438e9c1a97e22cb"),
+    @("https://files.pythonhosted.org/packages/a1/38/df03f564f43cec2684823f3cccae1a652ee7face1cbaa76fb223096e64d7/werkzeug-3.1.9-py3-none-any.whl", "6392e50c78460ba618e5b21f08a71f59c99ce99cdc6cf6e3dd7e6ccca8754fab"),
+    @("https://files.pythonhosted.org/packages/c3/e1/6f46c822f6657a69c8fef5d0824e0b5287d27b76d3769b501770b917fbb8/wrapt-2.5.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl", "1b35ef7379323a149a6398f6261248bf48b61666210bd69e2ab24a9a9afdedc0"),
+    @("https://files.pythonhosted.org/packages/ba/1d/c05e982a2220e1a208f5ca8792265cefb43e860e8796bff3245cc94fc2ce/xgboost_cpu-3.2.0-py3-none-manylinux_2_28_x86_64.whl", "9c10b1653e1a689bf4094a328144cf3633c9be0e5217a76fbdc2fde6abcb2950"),
+    @("https://files.pythonhosted.org/packages/28/b9/7818ac6dec7fbcd16be2d19495807c01e2c38834e57d41c63356a75e786b/yarl-1.25.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", "e5637ca8d0bd7fb72648a6c7934af4baaccb697657f7438c9d264fc2abb8b0b1"),
+    @("https://files.pythonhosted.org/packages/3a/13/547360d81e6d88d58492968ffda9f9542854f11310ee556fef14260cc886/zipp-4.1.0-py3-none-any.whl", "25ad4e16390cd314347dd8f1de67a2ac538ae658ed4ab9db16029c07c188e97f")
+)
+
+$done = 0; $failed = @()
+foreach ($p in $packages) {
+    $url = $p[0]; $sha = $p[1]; $file = Join-Path "wheels" ($url.Split("/")[-1])
+    if ((Test-Path $file) -and ((Get-FileHash $file -Algorithm SHA256).Hash -eq $sha.ToUpper())) { $done++; continue }
+    $ok = $false
+    for ($try = 1; $try -le 5 -and -not $ok; $try++) {
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing -TimeoutSec 600
+            if ((Get-FileHash $file -Algorithm SHA256).Hash -eq $sha.ToUpper()) { $ok = $true }
+            else { Write-Host "  checksum mismatch (incomplete download), retrying: $($file)" }
+        } catch { Write-Host "  attempt $try failed for $($file): $($_.Exception.Message)" ; Start-Sleep -Seconds 3 }
+    }
+    if ($ok) { $done++; Write-Host ("[{0}/{1}] {2}" -f $done, $packages.Count, (Split-Path $file -Leaf)) }
+    else { $failed += $url; Remove-Item $file -ErrorAction SilentlyContinue }
+}
+Write-Host ""
+Write-Host "Downloaded and verified: $done of $($packages.Count)"
+if ($failed.Count) { Write-Host "Failed (run the script again to retry):"; $failed | ForEach-Object { Write-Host "  $_" } }
+else { Write-Host "All packages ready. Now run:  docker compose up --build" }

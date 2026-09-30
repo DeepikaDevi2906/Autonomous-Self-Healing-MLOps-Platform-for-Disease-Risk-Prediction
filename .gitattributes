@@ -1,0 +1,5 @@
+# Keep Unix line endings for everything that runs inside Linux containers
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pkl binary

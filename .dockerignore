@@ -1,0 +1,17 @@
+# Keep the Docker build context small (the old project sent a ~80,000-file venv)
+venv/
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+mlflow/
+mlruns/
+data/processed/
+data/reference/
+data/batches/
+data/monitoring/
+dashboard/node_modules/
+dashboard/dist/
+
+.git/
+*.zip

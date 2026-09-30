@@ -1,0 +1,102 @@
+# Self-Healing MLOps Platform - central settings.
+# Every module reads from here (via src/common/config.py) instead of
+# hard-coding thresholds, paths or feature lists.
+
+data:
+  raw_path: data/raw/raw_data.csv
+  random_state: 42
+  # Row split per disease. "future_pool" rows are never used for training,
+  # validation or testing; simulated production batches are drawn from them,
+  # so new batches can never leak test rows into retraining.
+  split:
+    train: 0.60
+    val: 0.15
+    test: 0.15
+    future_pool: 0.10
+
+diseases:
+  diabetes:
+    display_name: Diabetes
+    features: [Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI,
+               DiabetesPedigreeFunction, Age]
+    # 0 is physiologically impossible for these columns -> treat as missing.
+    missing_codes:
+      Glucose: [0]
+      BloodPressure: [0]
+      SkinThickness: [0]
+      Insulin: [0]
+      BMI: [0]
+    invert_outcome: false
+    drift_features: [Glucose, BloodPressure, Insulin, BMI, Age]
+
+  heart_disease:
+    display_name: Heart disease
+    features: [age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang,
+               oldpeak, slope, ca, thal]
+    # In this (Kaggle) version of the UCI data, ca=4 and thal=0 encode "unknown".
+    missing_codes:
+      ca: [4]
+      thal: [0]
+    # In this dataset Outcome=1 means NO heart disease (the group with 1 has
+    # fewer blocked vessels, less angina, higher max heart rate). We invert it so
+    # that, across the whole platform, 1 always means "disease present".
+    invert_outcome: true
+    drift_features: [age, trestbps, chol, thalach, oldpeak]
+
+  breast_cancer:
+    display_name: Breast cancer
+    features: [mean_radius, mean_texture, mean_perimeter, mean_area, mean_smoothness,
+               mean_compactness, mean_concavity, mean_concave_points, mean_symmetry,
+               mean_fractal_dimension, radius_error, texture_error, perimeter_error,
+               area_error, smoothness_error, compactness_error, concavity_error,
+               concave_points_error, symmetry_error, fractal_dimension_error,
+               worst_radius, worst_texture, worst_perimeter, worst_area,
+               worst_smoothness, worst_compactness, worst_concavity,
+               worst_concave_points, worst_symmetry, worst_fractal_dimension]
+    missing_codes: {}
+    invert_outcome: false   # 1 = malignant
+    # a tumour-size shift moves the whole size family together
+    drift_features: [mean_radius, mean_perimeter, mean_area, radius_error, perimeter_error,
+                     area_error, worst_radius, worst_perimeter, worst_area, mean_texture,
+                     worst_texture]
+
+models:
+  random_forest:
+    n_estimators: 200
+    max_depth: 10
+  xgboost:
+    n_estimators: 200
+    learning_rate: 0.05
+    max_depth: 4
+  neural_network:
+    hidden_layer_sizes: [64, 32, 16]
+    max_iter: 800
+    early_stopping: true
+
+monitoring:
+  # Batch is "drifted" when more than this share of feature columns drifted
+  # (each column tested at p < 0.05). With 8-30 columns, 0.3 is a clear signal.
+  drift_share_threshold: 0.3
+  # Retrain when batch AUC is this much below the champion's own test AUC.
+  performance_drop_threshold: 0.05
+  # Batches smaller than this are skipped (statistics would be meaningless).
+  min_batch_rows: 30
+
+retraining:
+  # Share of every new batch held back for champion-vs-challenger comparison.
+  batch_eval_fraction: 0.3
+  # "Recent data" for the comparison = held-out parts of this many newest
+  # batches (one small batch alone can be ~10 patients: too few to judge).
+  recent_eval_batches: 3
+  # Challenger must beat the champion on recent data by at least this much...
+  min_improvement: 0.005
+  # ...and may not lose more than this on the original test set.
+  max_test_regression: 0.02
+  # After a retraining run, this many further batches must arrive before the
+  # same disease is retrained again automatically (alerts are still raised).
+  # Stops an unfixable drop from retraining every day.
+  cooldown_batches: 2
+
+mlflow:
+  model_name_suffix: _model
+  champion_alias: champion

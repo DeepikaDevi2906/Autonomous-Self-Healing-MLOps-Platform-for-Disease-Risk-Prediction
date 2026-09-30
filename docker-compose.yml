@@ -1,0 +1,111 @@
+# Self-Healing MLOps Platform: the whole stack with ONE command, from this folder:
+#
+#     docker compose up --build
+#
+# Slow or unreliable internet? First run  .\scripts\download_wheels.ps1  (see README).
+# First start takes a few minutes (image builds + automatic model training).
+#   Dashboard   http://localhost:3000
+#   API docs    http://localhost:8000/docs
+#   MLflow UI   http://localhost:5000
+#   Airflow     http://localhost:8080   (no login in this local setup)
+#
+# Ports are set in .env. Stop with Ctrl+C, or: docker compose down
+# Remove everything including trained models: docker compose down -v
+
+name: self-healing-mlops
+
+services:
+  mlflow:
+    # Reuses the API image (it contains mlflow), so it is built only once.
+    image: self-healing-mlops-app:latest
+    pull_policy: never
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --host 0.0.0.0 --port 5000 --workers 2
+      --allowed-hosts mlflow,mlflow:5000,localhost,localhost:${MLFLOW_PORT:-5000},127.0.0.1,127.0.0.1:${MLFLOW_PORT:-5000}
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 10
+    depends_on:
+      api-image:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Builds the shared image before MLflow starts; exits immediately.
+  api-image:
+    image: self-healing-mlops-app:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.10-slim}
+    command: ["python", "-c", "print('image ready')"]
+    restart: "no"
+
+  api:
+    image: self-healing-mlops-app:latest
+    pull_policy: never
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AUTO_SETUP: "true"
+      CORS_ORIGINS: http://localhost:${DASHBOARD_PORT:-3000},http://127.0.0.1:${DASHBOARD_PORT:-3000}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - platform-data:/app/data    # processed data, batches and monitoring logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/info')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 240s
+      retries: 6
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ./dashboard
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    ports:
+      - "${DASHBOARD_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  airflow:
+    image: ${AIRFLOW_IMAGE:-apache/airflow:3.3.0}
+    command: standalone
+    environment:
+      PLATFORM_API_URL: http://api:8000
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"   # local use only: no login
+    ports:
+      - "${AIRFLOW_PORT:-8080}:8080"
+    volumes:
+      - airflow-home:/opt/airflow
+      - ./airflow/dags:/opt/airflow/dags:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mlflow-data:
+  platform-data:
+  airflow-home:

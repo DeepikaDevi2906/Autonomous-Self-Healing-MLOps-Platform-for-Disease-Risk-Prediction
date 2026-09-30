@@ -1,0 +1,36 @@
+# One image for the API *and* the MLflow tracking server (it already contains
+# mlflow), so the Python packages are installed only once.
+ARG PYTHON_IMAGE=python:3.10-slim
+FROM ${PYTHON_IMAGE}
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src \
+    MLOPS_PROJECT_ROOT=/app
+
+WORKDIR /app
+
+# libgomp is required by xgboost
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+# Python packages:
+#  * ./wheels (filled by scripts/download_wheels.ps1) is used first, so nothing
+#    large has to be downloaded inside Docker;
+#  * anything missing is downloaded, and the pip cache is kept between build
+#    attempts, so a dropped connection only costs the file that was in progress.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,source=wheels,target=/tmp/wheels \
+    pip install --default-timeout=120 --retries=10 --find-links /tmp/wheels -r requirements.txt
+
+COPY config/ ./config/
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY data/raw/ ./data/raw/
+COPY samples/ ./samples/
+
+EXPOSE 8000 5000
+# Waits for MLflow, trains the models on first start, then runs uvicorn (1 worker).
+CMD ["python", "scripts/docker_start.py"]
